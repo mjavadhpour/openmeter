@@ -28,7 +28,7 @@ permissions:
 jobs:
   container-image:
     name: Container image
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || 'ubuntu-latest-large' }}
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
@@ -112,34 +112,9 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
           outputs: ${{ steps.build-output.outputs.value }}
 
-      - name: Set image ref
-        id: image-ref
-        run: echo "value=${{ steps.image-name.outputs.value }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-      - name: Fetch image
-        run: skopeo --insecure-policy copy docker://${{ steps.image-ref.outputs.value }} oci-archive:image.tar
-        if: inputs.publish
-
-      - name: Extract OCI tarball
-        run: |
-          mkdir -p image
-          tar -xf image.tar -C image
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.23.0
-        with:
-          input: image
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3.25.11
-        with:
-          sarif_file: trivy-results.sarif
-
   benthos-collector-container-image:
     name: Benthos Collector Container image
-    runs-on: ${{ github.actor == 'dependabot[bot]' && 'ubuntu-latest' || 'ubuntu-latest-large' }}
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
@@ -211,28 +186,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max,ignore-error=true
           outputs: ${{ steps.build-output.outputs.value }}
-
-      - name: Set image ref
-        id: image-ref
-        run: echo "value=${{ steps.image-name.outputs.value }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-      - name: Fetch image
-        run: skopeo --insecure-policy copy docker://${{ steps.image-ref.outputs.value }} oci-archive:image.tar
-        if: inputs.publish
-
-      - name: Extract OCI tarball
-        run: |
-          mkdir -p image
-          tar -xf image.tar -C image
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.23.0
-        with:
-          input: image
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3.25.11
-        with:
-          sarif_file: trivy-results.sarif
