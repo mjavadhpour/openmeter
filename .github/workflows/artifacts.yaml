@@ -1,29 +1,13 @@
 name: Artifacts
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       publish:
         description: Publish artifacts to the artifact store
         default: false
         required: false
         type: boolean
-    outputs:
-      container-image-name:
-        description: Container image name
-        value: ${{ jobs.container-image.outputs.name }}
-      container-image-digest:
-        description: Container image digest
-        value: ${{ jobs.container-image.outputs.digest }}
-      container-image-tag:
-        description: Container image tag
-        value: ${{ jobs.container-image.outputs.tag }}
-      container-image-ref:
-        description: Container image ref
-        value: ${{ jobs.container-image.outputs.ref }}
-
-permissions:
-  contents: read
 
 jobs:
   container-image:
