@@ -51,7 +51,7 @@ jobs:
 
       - name: Set image name
         id: image-name
-        run: echo "value=ghcr.io/${{ github.repository }}" >> "$GITHUB_OUTPUT"
+        run: echo "value=mjhpour/openmeter" >> "$GITHUB_OUTPUT"
 
       - name: Gather build metadata
         id: meta
@@ -67,12 +67,12 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch,suffix=-{{sha}}-{{date 'X'}},enable={{is_default_branch}}
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         if: inputs.publish
 
       - name: Build and push image
@@ -100,29 +100,6 @@ jobs:
           echo "token=$PULL_TOKEN" >> "$GITHUB_OUTPUT"
           echo "::add-mask::$PULL_TOKEN"
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # 0.32.0
-        with:
-          image-ref: registry.depot.dev/${{ vars.DEPOT_PROJECT }}:${{ steps.build.outputs.build-id }}
-          format: sarif
-          output: trivy-results.sarif
-        env:
-          TRIVY_USERNAME: x-token
-          TRIVY_PASSWORD: ${{ steps.pull-token.outputs.token }}
-          TRIVY_DB_REPOSITORY: ghcr.io/openmeterio/trivy-db:2
-
-      - name: Upload Trivy scan results as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: "[${{ github.job }}] Trivy scan results"
-          path: trivy-results.sarif
-          retention-days: 5
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.29.4
-        with:
-          sarif_file: trivy-results.sarif
-
   benthos-collector-container-image:
     name: Benthos Collector Container image
     runs-on: ubuntu-latest
@@ -148,7 +125,7 @@ jobs:
 
       - name: Set image name
         id: image-name
-        run: echo "value=ghcr.io/openmeterio/benthos-collector" >> "$GITHUB_OUTPUT"
+        run: echo "value=mjhpour/benthos-collector" >> "$GITHUB_OUTPUT"
 
       - name: Gather build metadata
         id: meta
@@ -164,12 +141,12 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch,suffix=-{{sha}}-{{date 'X'}},enable={{is_default_branch}}
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Docker Hub
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         if: inputs.publish
 
       - name: Build and push image
@@ -197,26 +174,3 @@ jobs:
           PULL_TOKEN="$(depot pull-token --project ${{ vars.DEPOT_PROJECT }})"
           echo "token=$PULL_TOKEN" >> "$GITHUB_OUTPUT"
           echo "::add-mask::$PULL_TOKEN"
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # 0.32.0
-        with:
-          image-ref: registry.depot.dev/${{ vars.DEPOT_PROJECT }}:${{ steps.build.outputs.build-id }}
-          format: sarif
-          output: trivy-results.sarif
-        env:
-          TRIVY_USERNAME: x-token
-          TRIVY_PASSWORD: ${{ steps.pull-token.outputs.token }}
-          TRIVY_DB_REPOSITORY: ghcr.io/openmeterio/trivy-db:2
-
-      - name: Upload Trivy scan results as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: "[${{ github.job }}] Trivy scan results"
-          path: trivy-results.sarif
-          retention-days: 5
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3.29.4
-        with:
-          sarif_file: trivy-results.sarif
