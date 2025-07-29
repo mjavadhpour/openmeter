@@ -8,22 +8,6 @@ on:
         default: false
         required: false
         type: boolean
-    outputs:
-      container-image-name:
-        description: Container image name
-        value: ${{ jobs.container-image.outputs.name }}
-      container-image-digest:
-        description: Container image digest
-        value: ${{ jobs.container-image.outputs.digest }}
-      container-image-tag:
-        description: Container image tag
-        value: ${{ jobs.container-image.outputs.tag }}
-      container-image-ref:
-        description: Container image ref
-        value: ${{ jobs.container-image.outputs.ref }}
-
-permissions:
-  contents: read
 
 jobs:
   container-image:
@@ -44,10 +28,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.1.7
 
-      - name: Set up Depot CLI
-        uses: depot/setup-action@b0b1ea4f69e92ebf5dea3f8713a1b0c37b2126a5 # v1.6.0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.3.0
 
       - name: Set image name
         id: image-name
@@ -55,49 +42,50 @@ jobs:
 
       - name: Gather build metadata
         id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        uses: docker/metadata-action@v5.5.1
         with:
           images: ${{ steps.image-name.outputs.value }}
           flavor: |
-            latest = false
+            latest=false
           tags: |
+            type=semver,pattern={{version}}
             type=ref,event=branch
             type=ref,event=pr,prefix=pr-
-            type=semver,pattern={{raw}}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch,suffix=-{{sha}}-{{date 'X'}},enable={{is_default_branch}}
+
+      - name: Set image ref
+        id: image-ref
+        run: echo "value=${{ steps.image-name.outputs.value }}:${{ steps.meta.outputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine build output
+        uses: haya14busa/action-cond@v1.2.1
+        id: build-output
+        with:
+          cond: ${{ inputs.publish }}
+          if_true: type=image,push=true
+          if_false: type=oci,dest=image.tar
 
       - name: Login to Docker Hub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+        uses: docker/login-action@v3.2.0
         if: inputs.publish
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push image
         id: build
-        uses: depot/build-push-action@2583627a84956d07561420dcc1d0eb1f2af3fac0 # v1.15.0
+        uses: docker/build-push-action@v6.2.0
         with:
           context: .
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-          platforms: linux/amd64,linux/arm64 # The confluent library doesn't support ARMv7
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          push: ${{ inputs.publish }}
-          save: true
-          project: ${{ vars.DEPOT_PROJECT }}
-
-      - name: Set image ref
-        id: image-ref
-        run: echo "value=${{ steps.image-name.outputs.value }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-      - name: Retrieve pull token
-        id: pull-token
-        run: |
-          PULL_TOKEN="$(depot pull-token --project ${{ vars.DEPOT_PROJECT }})"
-          echo "token=$PULL_TOKEN" >> "$GITHUB_OUTPUT"
-          echo "::add-mask::$PULL_TOKEN"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+          outputs: ${{ steps.build-output.outputs.value }}
 
   benthos-collector-container-image:
     name: Benthos Collector Container image
@@ -117,10 +105,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.1.7
 
-      - name: Set up Depot CLI
-        uses: depot/setup-action@b0b1ea4f69e92ebf5dea3f8713a1b0c37b2126a5 # v1.6.0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.3.0
 
       - name: Set image name
         id: image-name
@@ -128,28 +119,41 @@ jobs:
 
       - name: Gather build metadata
         id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        uses: docker/metadata-action@v5.5.1
         with:
           images: ${{ steps.image-name.outputs.value }}
           flavor: |
-            latest = false
+            latest=false
           tags: |
+            type=semver,pattern={{version}}
             type=ref,event=branch
             type=ref,event=pr,prefix=pr-
-            type=semver,pattern={{raw}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch,suffix=-{{sha}}-{{date 'X'}},enable={{is_default_branch}}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+      - name: Set image ref
+        id: image-ref
+        run: echo "value=${{ steps.image-name.outputs.value }}:${{ steps.meta.outputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine build output
+        uses: haya14busa/action-cond@v1.2.1
+        id: build-output
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+          cond: ${{ inputs.publish }}
+          if_true: type=image,push=true
+          if_false: type=oci,dest=image.tar
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3.2.0
         if: inputs.publish
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push image
         id: build
-        uses: depot/build-push-action@2583627a84956d07561420dcc1d0eb1f2af3fac0 # v1.15.0
+        uses: docker/build-push-action@v6.2.0
         with:
           context: .
           file: benthos-collector.Dockerfile
@@ -158,17 +162,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          push: ${{ inputs.publish }}
-          save: true
-          project: ${{ vars.DEPOT_PROJECT }}
-
-      - name: Set image ref
-        id: image-ref
-        run: echo "value=${{ steps.image-name.outputs.value }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-      - name: Retrieve pull token
-        id: pull-token
-        run: |
-          PULL_TOKEN="$(depot pull-token --project ${{ vars.DEPOT_PROJECT }})"
-          echo "token=$PULL_TOKEN" >> "$GITHUB_OUTPUT"
-          echo "::add-mask::$PULL_TOKEN"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+          outputs: ${{ steps.build-output.outputs.value }}

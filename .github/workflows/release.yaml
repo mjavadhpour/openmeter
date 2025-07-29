@@ -14,6 +14,7 @@ jobs:
   artifacts:
     name: Artifacts
     uses: ./.github/workflows/artifacts.yaml
+    secrets: inherit
     with:
       publish: true
     permissions:
